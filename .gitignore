@@ -1,0 +1,6 @@
+# Compiled CLI (the wrapper caches it in ~/Library/Caches, but keep local builds out too)
+skills/iphone-mirroring/scripts/iphone-mirror-bin
+*.o
+.DS_Store
+# Screenshots taken while testing
+*.png

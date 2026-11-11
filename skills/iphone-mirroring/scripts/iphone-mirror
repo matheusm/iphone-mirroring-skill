@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# iphone-mirror wrapper: compiles iphone-mirror.swift on first use (and again whenever the source changes),
+# caches the binary, then runs it with all arguments. Needs macOS + Xcode Command Line Tools (swiftc).
+#
+#   scripts/iphone-mirror doctor
+#   scripts/iphone-mirror shot /tmp/phone.png
+#
+# Cache location: $IPHONE_MIRROR_CACHE, default ~/Library/Caches/iphone-mirroring-skill
+set -euo pipefail
+
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+src="$here/iphone-mirror.swift"
+
+if [[ "$(uname -s)" != "Darwin" ]]; then
+  echo "iphone-mirror only works on macOS (iPhone Mirroring needs macOS 15 or later)." >&2
+  exit 1
+fi
+
+cache="${IPHONE_MIRROR_CACHE:-$HOME/Library/Caches/iphone-mirroring-skill}"
+hash="$(shasum -a 256 "$src" | cut -c1-16)"
+bin="$cache/iphone-mirror-$hash"
+
+if [[ ! -x "$bin" ]]; then
+  if ! command -v swiftc >/dev/null 2>&1; then
+    echo "swiftc not found. Install the Xcode Command Line Tools with: xcode-select --install" >&2
+    exit 127
+  fi
+  mkdir -p "$cache"
+  echo "iphone-mirror: compiling (first run, ~10 s)..." >&2
+  tmp="$bin.tmp.$$"
+  if ! swiftc -O "$src" -o "$tmp" >&2; then
+    rm -f "$tmp"
+    echo "iphone-mirror: compilation failed. Try: xcode-select --install, or sudo xcode-select -s /Library/Developer/CommandLineTools" >&2
+    exit 1
+  fi
+  mv -f "$tmp" "$bin"
+  # Drop binaries built from older versions of the source.
+  find "$cache" -maxdepth 1 -name 'iphone-mirror-*' ! -name "iphone-mirror-$hash" ! -name '*.tmp.*' -type f -delete 2>/dev/null || true
+fi
+
+exec "$bin" "$@"
